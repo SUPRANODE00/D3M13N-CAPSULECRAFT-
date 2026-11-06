@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Houston Earth Window</title>
+<style>
+:root{--bg:#02040a;--panel:rgba(255,255,255,.9);--ink:#0b1220;--acc:#0a6f93;--ln:rgba(0,0,0,.18);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--panel:rgba(8,14,26,.8);--ink:#e6f1ff;--acc:#4cc9f0;--ln:rgba(255,255,255,.2);color-scheme:dark}}
+:root[data-theme="dark"]{--panel:rgba(8,14,26,.8);--ink:#e6f1ff;--acc:#4cc9f0;--ln:rgba(255,255,255,.2);color-scheme:dark}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--bg);overflow:hidden;font:13px/1.4 "Trebuchet MS",Verdana,sans-serif;color:var(--ink);touch-action:none}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:5}
+canvas{display:block;position:fixed;inset:0}
+#hud{position:fixed;left:10px;top:calc(10px + env(safe-area-inset-top,0px));background:var(--panel);border:1px solid var(--ln);border-radius:10px;padding:8px 11px;max-width:230px;z-index:6;backdrop-filter:blur(6px)}
+#hud b{font-size:15px;letter-spacing:.2px}
+#hud div{display:flex;justify-content:space-between;gap:12px;font-variant-numeric:tabular-nums}
+#hud span{opacity:.7}
+#bar{position:fixed;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:0 8px;z-index:6}
+button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--ln);border-radius:8px;padding:7px 11px;cursor:pointer;backdrop-filter:blur(6px)}
+button.on{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#note{position:fixed;right:10px;top:calc(10px + env(safe-area-inset-top,0px));max-width:200px;font-size:11px;opacity:.75;text-align:right;z-index:6;color:#9fb4d0}
+#rfcol{position:fixed;right:10px;top:calc(92px + env(safe-area-inset-top,0px));width:228px;max-height:calc(100vh - 210px);overflow:auto;display:flex;flex-direction:column;gap:6px;z-index:6;touch-action:pan-y}
+.rc{background:var(--panel);border:1px solid var(--ln);border-radius:10px;padding:7px 10px;backdrop-filter:blur(6px);font-size:12px}
+.rc b{font-size:13px}.rr{display:flex;justify-content:space-between;gap:8px}.rr span{opacity:.65;white-space:nowrap}.rr i{font-style:normal;text-align:right;font-variant-numeric:tabular-nums;word-break:break-word}
+.rc canvas{width:100%;height:40px;display:block;border:1px solid var(--ln);border-radius:4px;margin-top:5px}
+.rc p{margin:5px 0 0;font-size:11px;opacity:.7}#lg{white-space:pre-line;font:11px Consolas,monospace;margin-top:4px}
+.cr{margin-top:4px}.cr span{display:block;opacity:.65;font-size:10px}.cr code{display:block;font:11px Consolas,monospace;word-break:break-all;max-height:44px;overflow:auto}
+#rfC label{display:block;margin-top:5px;font-size:11px;opacity:.8}#rfC input{width:100%;box-sizing:border-box;background:transparent;color:var(--ink);border:1px solid var(--ln);border-radius:4px;padding:4px;font:inherit}
+</style></head><body>
+<div id="hud"><b>Houston, TX</b>
+<div><span>29.76°N 95.37°W</span><i id="sync">sync locked</i></div>
+<div><span>Local</span><i id="tl"></i></div>
+<div><span>UTC</span><i id="tu"></i></div>
+<div><span>Sun at Houston</span><i id="se"></i></div>
+<div><span>Looking at</span><i id="vc"></i></div>
+<div><span>Clock speed</span><i id="sp">live</i></div></div>
+<div id="note">Drag to turn Earth. Pinch or scroll to zoom. Clock-driven sun and night side; no external data feeds.</div>
+<div id="rfcol"><div class="rc" id="rfh"><b>RF layer</b> <span id="rfs"></span><p>Modelled values: free-space path loss, thermal noise (kTB), lapse rate, solar constant. A browser cannot read real RF RSSI. Heights are drawn about 29,000x exaggerated; the stack is 101 nodes, one per foot, 0 to 100 ft.</p></div>
+<div class="rc" id="rfC"><b>Script and cipher converter</b>
+<label>Trademark / business label<input id="cM" maxlength="40"></label>
+<label>Message<input id="cT" value="node online" maxlength="80"></label>
+<label>Node (ft, 0 to 100)<input id="cF" type="number" min="0" max="100" value="100"></label>
+<label>Key<input id="cK" maxlength="40"></label><div id="cO"></div>
+<p>Toy cipher and bigram language model for demonstration. Not secure; never use for confidential data.</p></div>
+<div class="rc" id="rfL"><b>Supervision bot mesh</b><div id="lg"></div></div></div>
+<div id="bar">
+<button id="bL" class="on">Lock Houston</button><button id="bS" class="on">Server layer</button><button id="bO" class="on">Map overlay</button><button id="bG" class="on">Grid</button><button id="bT">Speed up time</button><button id="bP">Split view</button><button id="bRF" class="on">RF layer</button><button id="bGr">Ground panel</button><button id="bHi">100 ft panel</button><button id="bBo" class="on">Bot mesh</button><button id="bTu" class="on">Tunnel</button><button id="bCv">Converter</button><button id="bV">Enter VR</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const D=Math.PI/180,$=id=>document.getElementById(id);
+const ll=(a,o,r)=>{const p=(90-a)*D,t=(o+180)*D;return new THREE.Vector3(-r*Math.sin(p)*Math.cos(t),r*Math.cos(p),r*Math.sin(p)*Math.sin(t))};
+const HOU=[29.76,-95.37];
+// ---------- Earth texture (procedural: land in R, city lights in G)
+const LAND=[
+[[-165,64],[-157,71],[-141,70],[-128,70],[-115,68],[-95,68],[-85,70],[-82,63],[-93,58],[-80,52],[-78,60],[-70,60],[-62,56],[-56,52],[-66,45],[-70,42],[-76,38],[-81,31],[-80,25],[-83,29],[-88,30],[-94,29.5],[-97,26],[-97,22],[-92,18],[-88,21],[-87,16],[-83,10],[-79,9],[-85,11],[-92,15],[-105,20],[-106,23],[-110,27],[-115,30],[-117,33],[-121,35],[-124,40],[-124,47],[-130,54],[-137,59],[-148,60],[-153,58],[-160,56],[-165,60]],
+[[-55,60],[-45,60],[-20,70],[-20,82],[-60,82],[-72,78],[-55,68]],
+[[-80,9],[-72,12],[-62,10],[-52,5],[-50,0],[-35,-5],[-39,-14],[-48,-26],[-58,-35],[-65,-42],[-68,-52],[-72,-54],[-75,-48],[-73,-38],[-71,-25],[-76,-14],[-81,-5],[-80,0],[-77,8]],
+[[-10,36],[-9,43],[-1,46],[-5,48],[2,51],[8,54],[10,58],[5,62],[15,69],[25,71],[40,68],[60,70],[80,73],[105,78],[130,72],[160,70],[180,67],[180,65],[170,60],[163,58],[156,51],[142,54],[140,48],[131,43],[127,40],[129,35],[125,38],[121,40],[122,31],[120,26],[110,21],[106,20],[108,11],[104,9],[100,13],[100,3],[104,1],[98,8],[97,17],[92,22],[88,21],[80,15],[77,8],[73,17],[70,22],[67,25],[57,26],[52,28],[48,30],[44,37],[36,36],[30,36],[27,37],[26,40],[23,40],[19,42],[13,45],[16,41],[18,40],[16,38],[12,42],[8,44],[3,43],[-3,37]],
+[[35,30],[43,13],[52,16],[58,22],[56,26],[50,26],[48,30],[40,30]],
+[[-17,21],[-13,28],[-6,36],[10,37],[11,33],[20,32],[32,31],[35,28],[43,12],[51,12],[44,0],[40,-10],[40,-16],[35,-24],[32,-29],[26,-34],[18,-34],[14,-22],[12,-6],[9,3],[5,5],[-8,4],[-13,8],[-17,14]],
+[[114,-22],[122,-18],[130,-12],[137,-12],[142,-11],[146,-19],[153,-26],[150,-37],[141,-38],[135,-35],[130,-32],[116,-35],[113,-26]],
+[[-180,-72],[-120,-74],[-60,-68],[0,-70],[60,-67],[120,-66],[180,-72],[180,-90],[-180,-90]],
+[[-5,50],[1,51],[-3,56],[-5,58],[-6,55]],[[130,31],[135,34],[140,36],[142,40],[141,44],[139,40],[133,35]],
+[[109,1],[117,7],[119,1],[116,-4],[110,-3]],[[44,-25],[47,-25],[50,-15],[49,-12],[44,-17]],[[95,5],[98,4],[106,-6],[104,-6],[100,-1]]];
+const NODES=[["Houston",29.76,-95.37],["Dallas",32.78,-96.8],["Ashburn",39.04,-77.49],["Los Angeles",34.05,-118.24],["Mexico City",19.43,-99.13],["São Paulo",-23.55,-46.63],["London",51.5,-0.12],["Frankfurt",50.11,8.68],["Lagos",6.52,3.38],["Mumbai",19.08,72.88],["Singapore",1.35,103.82],["Tokyo",35.68,139.69],["Sydney",-33.87,151.21]];
+const tc=document.createElement('canvas');tc.width=1024;tc.height=512;
+(function(){const c=tc.getContext('2d'),X=o=>(o+180)/360*1024,Y=a=>(90-a)/180*512;
+c.fillStyle='#000';c.fillRect(0,0,1024,512);c.fillStyle='rgb(255,0,0)';
+LAND.forEach(p=>{c.beginPath();p.forEach((q,i)=>i?c.lineTo(X(q[0]),Y(q[1])):c.moveTo(X(q[0]),Y(q[1])));c.closePath();c.fill()});
+NODES.concat([["",40.7,-74],["",48.85,2.35],["",31.2,121.5],["",28.6,77.2],["",-34.6,-58.4],["",30,31.2],["",55.7,37.6],["",41,29],["",37.5,127],["",23.1,113.3],["",33.7,-84.4],["",41.9,-87.6],["",25.8,-80.2],["",45.5,-73.6],["",-26.2,28],["",19,-99]]).forEach(n=>{const g=c.createRadialGradient(X(n[2]),Y(n[1]),0,X(n[2]),Y(n[1]),5);g.addColorStop(0,'rgba(255,255,0,1)');g.addColorStop(1,'rgba(255,0,0,1)');c.fillStyle=g;c.beginPath();c.arc(X(n[2]),Y(n[1]),5,0,7);c.fill()});})();
+const earthTex=new THREE.CanvasTexture(tc);earthTex.anisotropy=4;
+// ---------- scene
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+document.body.prepend(renderer.domElement);renderer.xr.enabled=true;
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(45,1,.1,200),root=new THREE.Group();scene.add(root);
+const globe=new THREE.Group();root.add(globe);
+const U={map:{value:earthTex},sun:{value:new THREE.Vector3(1,0,0)},grid:{value:1}};
+globe.add(new THREE.Mesh(new THREE.SphereGeometry(1,96,64),new THREE.ShaderMaterial({uniforms:U,
+vertexShader:`varying vec2 vUv;varying vec3 vN;varying vec3 vVN;void main(){vUv=uv;vN=normal;vVN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+fragmentShader:`uniform sampler2D map;uniform vec3 sun;uniform float grid;varying vec2 vUv;varying vec3 vN;varying vec3 vVN;
+void main(){vec4 t=texture2D(map,vUv);float land=t.r,city=t.g;float d=dot(normalize(vN),normalize(sun));float k=smoothstep(-.12,.18,d);float lit=clamp(d,0.,1.)*.75+.25;
+vec3 dayC=mix(vec3(.04,.2,.42),vec3(.22,.46,.24),land)*lit;vec3 nightC=mix(vec3(.008,.016,.045),vec3(.03,.05,.05),land);
+vec3 col=mix(nightC,dayC,k);col+=vec3(1.,.72,.28)*city*land*(1.-k)*1.3;col+=vec3(.55,.22,.1)*exp(-pow(d*7.,2.))*.22;
+vec2 f=abs(fract(vUv*vec2(24.,12.)-.5)-.5);col+=vec3(.2,.55,.9)*(1.-smoothstep(0.,.035,min(f.x,f.y)))*.16*grid;
+col+=vec3(.2,.5,1.)*pow(1.-max(vVN.z,0.),3.)*.7*(.35+.65*k);gl_FragColor=vec4(col,1.);}`})));
+root.add(new THREE.Mesh(new THREE.SphereGeometry(1.07,64,48),new THREE.ShaderMaterial({transparent:true,side:THREE.BackSide,blending:THREE.AdditiveBlending,depthWrite:false,
+vertexShader:`varying vec3 n;void main(){n=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+fragmentShader:`varying vec3 n;void main(){float i=pow(.72-dot(n,vec3(0,0,1.)),3.);gl_FragColor=vec4(.3,.6,1.,1.)*i;}`})));
+const st=[];for(let i=0;i<900;i++){const a=Math.random()*6.283,b=Math.acos(2*Math.random()-1);st.push(60*Math.sin(b)*Math.cos(a),60*Math.cos(b),60*Math.sin(b)*Math.sin(a))}
+const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(st,3));scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0x9db8e0,size:.12})));
+// ---------- server layer
+const srv=new THREE.Group();globe.add(srv);const R2=1.18;
+srv.add(new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(R2,3)),new THREE.LineBasicMaterial({color:0x4cc9f0,transparent:true,opacity:.1})));
+function label(t,col){const c=document.createElement('canvas');c.width=256;c.height=64;const x=c.getContext('2d');x.font='bold 30px Trebuchet MS,sans-serif';x.fillStyle=col;x.shadowColor='#000';x.shadowBlur=6;x.textAlign='center';x.fillText(t,128,42);
+const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true}));s.scale.set(.32,.08,1);return s}
+const pk=[],arcs=[];let hubPos;
+NODES.forEach((n,i)=>{const p=ll(n[1],n[2],R2),hub=i==0;
+const m=new THREE.Mesh(new THREE.OctahedronGeometry(hub?.035:.02),new THREE.MeshBasicMaterial({color:hub?0xffa94d:0x4cc9f0}));m.position.copy(p);srv.add(m);
+srv.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([ll(n[1],n[2],1),p]),new THREE.LineBasicMaterial({color:hub?0xffa94d:0x4cc9f0,transparent:true,opacity:.5})));
+const l=label(n[0],hub?'#ffc27a':'#bfe9ff');l.position.copy(ll(n[1],n[2],R2+.07));srv.add(l);
+if(hub){hubPos=p;return}
+const a=hubPos,dist=a.angleTo(p),mid=a.clone().add(p).normalize().multiplyScalar(R2+dist*.32);
+const cv=new THREE.QuadraticBezierCurve3(a,mid,p);arcs.push({cv,km:dist*6371,name:n[0]});
+srv.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(cv.getPoints(48)),new THREE.LineBasicMaterial({color:0xffa94d,transparent:true,opacity:.35})));
+const pm=new THREE.Mesh(new THREE.SphereGeometry(.014,8,8),new THREE.MeshBasicMaterial({color:0xfff1c9}));srv.add(pm);pk.push({m:pm,cv,o:Math.random(),v:.12+Math.random()*.1})});
+// ---------- Houston pin
+const pinL=ll(HOU[0],HOU[1],1),pin=new THREE.Group();pin.position.copy(pinL);globe.add(pin);
+pin.add(new THREE.Mesh(new THREE.SphereGeometry(.014,12,12),new THREE.MeshBasicMaterial({color:0xff4d4d})));
+const ring=new THREE.Mesh(new THREE.RingGeometry(.03,.034,48),new THREE.MeshBasicMaterial({color:0xff4d4d,transparent:true,side:THREE.DoubleSide,depthWrite:false}));
+ring.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),pinL.clone().normalize());ring.position.copy(pinL.clone().multiplyScalar(1.003));globe.add(ring);
+// ---------- pinned local-map overlay
+const mc=document.createElement('canvas');mc.width=mc.height=512;const mx=mc.getContext('2d'),mt=new THREE.CanvasTexture(mc);
+const panel=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:mt,transparent:true,depthTest:false}));panel.renderOrder=10;root.add(panel);
+const lg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),lineM=new THREE.LineBasicMaterial({color:0xff4d4d,transparent:true,depthTest:false});
+const link=new THREE.Line(lg,lineM);link.renderOrder=9;root.add(link);
+const PX=565,PY=651,P=(a,o)=>[256+(o-HOU[1])*PX,272-(a-HOU[0])*PY];
+const path=(pts,close)=>{mx.beginPath();pts.forEach((q,i)=>{const p=P(q[0],q[1]);i?mx.lineTo(p[0],p[1]):mx.moveTo(p[0],p[1])});if(close)mx.closePath()};
+const ell=(a,o,ra,ro)=>{const p=P(a,o);mx.beginPath();mx.ellipse(p[0],p[1],ro*PX,ra*PY,0,0,7)};
+const ROADS=[[[29.76,-95.37],[30.3,-95.45]],[[29.76,-95.37],[29.3,-94.9]],[[29.77,-95.37],[29.78,-95.95]],[[29.77,-95.37],[29.8,-94.8]],[[29.74,-95.38],[29.45,-95.8]],[[29.77,-95.36],[30.05,-95.15]],[[29.78,-95.4],[30.12,-95.95]],[[29.7,-95.38],[29.3,-95.4]]];
+const POI=[["Downtown",29.7604,-95.3698],["IAH",29.984,-95.342],["Hobby",29.645,-95.279],["NASA JSC",29.5518,-95.097],["Galleria",29.7396,-95.4618],["Med Center",29.7106,-95.3975]];
+let sunAz=0,sunEl=0;
+function drawMap(tm){const c=mx;c.clearRect(0,0,512,512);
+c.fillStyle='rgba(6,12,24,.94)';c.strokeStyle='#4cc9f0';c.lineWidth=2;c.beginPath();c.roundRect(2,2,508,508,18);c.fill();c.stroke();
+c.fillStyle='#e6f1ff';c.font='bold 22px Trebuchet MS,sans-serif';c.fillText('Houston local map',16,32);c.font='13px Trebuchet MS,sans-serif';c.fillStyle='#7fe0a0';c.textAlign='right';c.fillText('● pinned to globe',496,30);c.textAlign='left';
+c.save();c.beginPath();c.rect(12,44,488,456);c.clip();
+c.fillStyle='#0b1a2e';c.fillRect(12,44,488,456);
+c.fillStyle='#0d3b66';path([[29.70,-95.0],[29.6,-94.9],[29.5,-94.85],[29.38,-94.78],[29.2,-94.8],[29.2,-95.3],[29.35,-95.05],[29.5,-95.05],[29.62,-95.07]],true);c.fill();
+c.strokeStyle='rgba(120,170,220,.12)';c.lineWidth=1;for(let a=29.5;a<30.1;a+=.1){const y=P(a,0)[1];c.beginPath();c.moveTo(12,y);c.lineTo(500,y);c.stroke()}for(let o=-95.8;o<-94.8;o+=.1){const x=P(0,o)[0];c.beginPath();c.moveTo(x,44);c.lineTo(x,500);c.stroke()}
+c.strokeStyle='#2a8fbd';c.lineWidth=3;path([[29.77,-95.65],[29.78,-95.5],[29.76,-95.38],[29.74,-95.25],[29.72,-95.1],[29.68,-95.0]]);c.stroke();
+c.strokeStyle='#8ecae6';c.lineWidth=3;ROADS.forEach(r=>{path(r);c.stroke()});
+c.strokeStyle='#f4a261';c.lineWidth=4;ell(29.76,-95.40,.09,.10);c.stroke();
+c.strokeStyle='#e9c46a';c.lineWidth=3;c.setLineDash([9,6]);ell(29.78,-95.40,.2,.22);c.stroke();c.setLineDash([]);
+c.font='12px Trebuchet MS,sans-serif';c.fillStyle='#f4a261';let p=P(29.85,-95.40);c.fillText('Loop 610',p[0]-22,p[1]);c.fillStyle='#e9c46a';p=P(29.98,-95.40);c.fillText('Beltway 8',p[0]-26,p[1]);c.fillStyle='#8ecae6';p=P(30.25,-95.46);c.fillText('I-45',p[0]+5,p[1]);p=P(29.78,-95.9);c.fillText('I-10',p[0],p[1]-6);p=P(29.4,-95.65);c.fillText('US-59',p[0]+4,p[1]);
+c.fillStyle='#5fb0d8';p=P(29.45,-94.9);c.fillText('Galveston Bay',p[0]-30,p[1]);
+POI.forEach(q=>{p=P(q[1],q[2]);c.fillStyle='#ffd166';c.beginPath();c.arc(p[0],p[1],4,0,7);c.fill();c.fillStyle='#e6f1ff';c.fillText(q[0],p[0]+7,p[1]+4)});
+// Houston crosshair + sync pulse
+p=P(HOU[0],HOU[1]);const r=10+((tm/40)%40);c.strokeStyle='rgba(255,77,77,'+(1-(r-10)/40)+')';c.lineWidth=2;c.beginPath();c.arc(p[0],p[1],r,0,7);c.stroke();
+c.strokeStyle='#ff4d4d';c.lineWidth=2;c.beginPath();c.moveTo(p[0]-14,p[1]);c.lineTo(p[0]-5,p[1]);c.moveTo(p[0]+5,p[1]);c.lineTo(p[0]+14,p[1]);c.moveTo(p[0],p[1]-14);c.lineTo(p[0],p[1]-5);c.moveTo(p[0],p[1]+5);c.lineTo(p[0],p[1]+14);c.stroke();
+// sun direction
+const sx=Math.sin(sunAz*D),sy=-Math.cos(sunAz*D);c.globalAlpha=sunEl>0?1:.35;c.strokeStyle='#ffd166';c.fillStyle='#ffd166';c.lineWidth=2;c.beginPath();c.moveTo(p[0]+sx*30,p[1]+sy*30);c.lineTo(p[0]+sx*95,p[1]+sy*95);c.stroke();c.beginPath();c.arc(p[0]+sx*108,p[1]+sy*108,9,0,7);c.fill();c.globalAlpha=1;
+c.restore();c.fillStyle='#7fa3c7';c.font='12px Trebuchet MS,sans-serif';c.fillText('North up · 1 square ≈ 11 km · sun '+(sunEl>0?'above':'below')+' horizon',16,504);
+mt.needsUpdate=true}
+// ---------- time + sun
+let simT=Date.now(),speed=1,lastMap=0;const SP=[1,60,600,3600],SPN=['live','60×','600×','3600×'];
+const fL=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',weekday:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZoneName:'short'});
+function sunNow(){const d=new Date(simT),N=Math.floor((d-Date.UTC(d.getUTCFullYear(),0,0))/864e5),uh=d.getUTCHours()+d.getUTCMinutes()/60+d.getUTCSeconds()/3600;
+const dec=23.44*Math.sin(2*Math.PI*(284+N)/365),B=2*Math.PI*(N-81)/365,eot=9.87*Math.sin(2*B)-7.53*Math.cos(B)-1.5*Math.sin(B);
+let lon=-15*(uh-12+eot/60);lon=((lon+540)%360)-180;U.sun.value.copy(ll(dec,lon,1));
+const ph=HOU[0]*D,H=(HOU[1]-lon)*D,de=dec*D;sunEl=Math.asin(Math.sin(ph)*Math.sin(de)+Math.cos(ph)*Math.cos(de)*Math.cos(H))/D;
+sunAz=(Math.atan2(Math.sin(H),Math.cos(H)*Math.sin(ph)-Math.tan(de)*Math.cos(ph))/D+180+360)%360;return d}
+// ---------- interaction
+let lock=true,drag=false,zoom=1,split=false;const ptrs=new Map(),Z=new THREE.Vector3(0,0,1);
+const target=new THREE.Quaternion().setFromUnitVectors(pinL.clone().normalize(),Z);globe.quaternion.copy(target);
+const cv=renderer.domElement;let pd=0;
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);drag=true});
+cv.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=ptrs.get(e.pointerId);
+if(ptrs.size==2){const a=[...ptrs.values()];const d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(pd)zoom=Math.min(2.5,Math.max(.4,zoom*pd/d));pd=d}
+else{const dx=e.clientX-o[0],dy=e.clientY-o[1];globe.quaternion.premultiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(dy*.006/zoom,dx*.006/zoom,0)));if(lock&&(dx||dy)){lock=false;$('bL').classList.remove('on')}}
+ptrs.set(e.pointerId,[e.clientX,e.clientY])});
+const up=e=>{ptrs.delete(e.pointerId);pd=0;drag=ptrs.size>0};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('wheel',e=>{zoom=Math.min(2.5,Math.max(.4,zoom*(1+e.deltaY*.001)))},{passive:true});
+const tog=(id,fn)=>{$(id).onclick=()=>{const on=$(id).classList.toggle('on');fn(on)}};
+tog('bL',on=>lock=on);tog('bS',on=>srv.visible=on);tog('bO',on=>{panel.visible=link.visible=on});tog('bG',on=>U.grid.value=on?1:0);
+$('bT').onclick=()=>{const i=(SP.indexOf(speed)+1)%4;speed=SP[i];if(!i)simT=Date.now();$('sp').textContent
